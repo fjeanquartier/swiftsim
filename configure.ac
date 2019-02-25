@@ -1930,6 +1930,7 @@ AC_MSG_RESULT([
    Interaction debugging       : $enable_debug_interactions
    Stars interaction debugging : $enable_debug_interactions_stars
    Naive interactions          : $enable_naive_interactions
+   Naive stars interactions    : $enable_naive_interactions_stars
    Gravity checks              : $gravity_force_checks
    Custom icbrtf               : $enable_custom_icbrtf
 
