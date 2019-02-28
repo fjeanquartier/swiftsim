@@ -285,8 +285,7 @@ void DO_SYM_PAIR1_STARS(struct runner *r, struct cell *ci, struct cell *cj,
     struct spart *restrict sparts_i = ci->stars.parts;
     struct part *restrict parts_j = cj->hydro.parts;
     const double dj_min = sort_j[0].d;
-    const float dx_max_rshift =
-        (ci->stars.dx_max_sort + cj->hydro.dx_max_sort) - rshift;
+    const float dx_max_rshift = cj->hydro.dx_max_sort - rshift;
 
     /* Loop over the sparts in ci. */
     for (int pid = 0; pid < count_i; pid++) {
@@ -397,8 +396,7 @@ void DO_SYM_PAIR1_STARS(struct runner *r, struct cell *ci, struct cell *cj,
     struct part *restrict parts_i = ci->hydro.parts;
     struct spart *restrict sparts_j = cj->stars.parts;
     const double di_max = sort_i[count_i - 1].d - rshift;
-    const float dx_max_rshift =
-        (ci->hydro.dx_max_sort + cj->stars.dx_max_sort) + rshift;
+    const float dx_max_rshift = ci->hydro.dx_max_sort + rshift;
 
     /* Loop over the parts in cj. */
     for (int pjd = 0; pjd < count_j; pjd++) {
