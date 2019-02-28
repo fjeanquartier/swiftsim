@@ -976,7 +976,6 @@ void runner_do_hydro_sort(struct runner *r, struct cell *c, int flags,
   if (clock) TIMER_TOC(timer_dosort);
 }
 
-
 /**
  * @brief Initialize the multipoles before the gravity calculation.
  *

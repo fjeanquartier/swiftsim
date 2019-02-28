@@ -1144,7 +1144,6 @@ void engine_count_and_link_tasks_mapper(void *map_data, int num_elements,
           scheduler_addunlock(sched, t, finger->hydro.sorts);
     }
 
-
     /* Link self tasks to cells. */
     else if (t_type == task_type_self) {
       atomic_inc(&ci->nr_tasks);

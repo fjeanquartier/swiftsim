@@ -2060,7 +2060,6 @@ void cell_activate_hydro_sorts(struct cell *c, int sid, struct scheduler *s) {
   }
 }
 
-
 /**
  * @brief Traverse a sub-cell task and activate the hydro drift tasks that are
  * required by a hydro task
