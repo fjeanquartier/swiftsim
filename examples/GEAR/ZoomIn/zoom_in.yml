@@ -59,4 +59,5 @@ InitialConditions:
   periodic:   1
   cleanup_h_factors: 1               # Remove the h-factors inherited from Gadget
   cleanup_velocity_factors: 1        # Remove the sqrt(a) factor in the velocities inherited from Gadget
+  smoothing_length_scaling:    0.1   # (Optional) A scaling factor to apply to all smoothing lengths in the ICs.
 
