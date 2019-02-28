@@ -181,7 +181,6 @@ void space_rebuild_recycle_mapper(void *map_data, int num_elements,
       space_recycle_list(s, cell_rec_begin, cell_rec_end, multipole_rec_begin,
                          multipole_rec_end);
     c->hydro.sorts = NULL;
-    c->stars.sorts = NULL;
     c->nr_tasks = 0;
     c->grav.nr_mm_tasks = 0;
     c->hydro.density = NULL;
@@ -193,9 +192,7 @@ void space_rebuild_recycle_mapper(void *map_data, int num_elements,
     c->hydro.dx_max_part = 0.0f;
     c->hydro.dx_max_sort = 0.0f;
     c->stars.dx_max_part = 0.f;
-    c->stars.dx_max_sort = 0.f;
     c->hydro.sorted = 0;
-    c->stars.sorted = 0;
     c->hydro.count = 0;
     c->hydro.count_total = 0;
     c->hydro.updated = 0;
@@ -242,7 +239,6 @@ void space_rebuild_recycle_mapper(void *map_data, int num_elements,
     c->grav.parts = NULL;
     c->stars.parts = NULL;
     c->hydro.do_sub_sort = 0;
-    c->stars.do_sub_sort = 0;
     c->hydro.do_sub_drift = 0;
     c->grav.do_sub_drift = 0;
     c->stars.do_sub_drift = 0;
@@ -263,10 +259,6 @@ void space_rebuild_recycle_mapper(void *map_data, int num_elements,
       if (c->hydro.sort[i] != NULL) {
         free(c->hydro.sort[i]);
         c->hydro.sort[i] = NULL;
-      }
-      if (c->stars.sort[i] != NULL) {
-        free(c->stars.sort[i]);
-        c->stars.sort[i] = NULL;
       }
     }
 #if WITH_MPI
@@ -2425,10 +2417,6 @@ void space_map_clearsort(struct cell *c, void *data) {
       free(c->hydro.sort[i]);
       c->hydro.sort[i] = NULL;
     }
-    if (c->stars.sort[i] != NULL) {
-      free(c->stars.sort[i]);
-      c->stars.sort[i] = NULL;
-    }
   }
 }
 
@@ -2712,14 +2700,12 @@ void space_split_recursive(struct space *s, struct cell *c,
       cp->hydro.dx_max_sort = 0.f;
       cp->stars.h_max = 0.f;
       cp->stars.dx_max_part = 0.f;
-      cp->stars.dx_max_sort = 0.f;
       cp->nodeID = c->nodeID;
       cp->parent = c;
       cp->super = NULL;
       cp->hydro.super = NULL;
       cp->grav.super = NULL;
       cp->hydro.do_sub_sort = 0;
-      cp->stars.do_sub_sort = 0;
       cp->grav.do_sub_drift = 0;
       cp->hydro.do_sub_drift = 0;
       cp->stars.do_sub_drift = 0;
@@ -3210,7 +3196,6 @@ void space_getcells(struct space *s, int nr_cells, struct cell **cells) {
   for (int j = 0; j < nr_cells; j++) {
     for (int k = 0; k < 13; k++) {
       if (cells[j]->hydro.sort[k] != NULL) free(cells[j]->hydro.sort[k]);
-      if (cells[j]->stars.sort[k] != NULL) free(cells[j]->stars.sort[k]);
     }
     struct gravity_tensors *temp = cells[j]->grav.multipole;
     bzero(cells[j], sizeof(struct cell));
@@ -3236,10 +3221,6 @@ void space_free_buff_sort_indices(struct space *s) {
       if (finger->hydro.sort[k] != NULL) {
         free(finger->hydro.sort[k]);
         finger->hydro.sort[k] = NULL;
-      }
-      if (finger->stars.sort[k] != NULL) {
-        free(finger->stars.sort[k]);
-        finger->stars.sort[k] = NULL;
       }
     }
   }

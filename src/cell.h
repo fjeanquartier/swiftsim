@@ -490,9 +490,6 @@ struct cell {
     /*! Linked list of the tasks computing this cell's star feedback. */
     struct link *feedback;
 
-    /*! The task computing this cell's sorts before the density. */
-    struct task *sorts;
-
     /*! The drift task for sparts */
     struct task *drift;
 

@@ -146,7 +146,6 @@ __attribute__((always_inline)) INLINE static void drift_spart(
   for (int k = 0; k < 3; k++) {
     const float dx = sp->v[k] * dt_drift;
     sp->x_diff[k] -= dx;
-    sp->x_diff_sort[k] -= dx;
   }
 }
 

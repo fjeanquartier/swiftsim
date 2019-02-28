@@ -457,8 +457,6 @@ void engine_addtasks_recv_stars(struct engine *e, struct cell *c,
 #ifdef SWIFT_DEBUG_CHECKS
   if (c->nodeID == e->nodeID) error("Local cell!");
 #endif
-  if (c->stars.sorts != NULL)
-    scheduler_addunlock(s, t_feedback, c->stars.sorts);
 
   for (struct link *l = c->stars.density; l != NULL; l = l->next) {
     scheduler_addunlock(s, l->t, t_feedback);
@@ -817,11 +815,6 @@ void engine_make_hierarchical_tasks_hydro(struct engine *e, struct cell *c) {
     c->hydro.sorts =
         scheduler_addtask(s, task_type_sort, task_subtype_none, 0, 0, c, NULL);
 
-    if (with_feedback) {
-      c->stars.sorts = scheduler_addtask(s, task_type_stars_sort,
-                                         task_subtype_none, 0, 0, c, NULL);
-    }
-
     /* Local tasks only... */
     if (c->nodeID == e->nodeID) {
 
@@ -1151,14 +1144,6 @@ void engine_count_and_link_tasks_mapper(void *map_data, int num_elements,
           scheduler_addunlock(sched, t, finger->hydro.sorts);
     }
 
-    /* Link stars sort tasks to all the higher sort task. */
-    if (t_type == task_type_stars_sort) {
-      for (struct cell *finger = t->ci->parent; finger != NULL;
-           finger = finger->parent) {
-        if (finger->stars.sorts != NULL)
-          scheduler_addunlock(sched, t, finger->stars.sorts);
-      }
-    }
 
     /* Link self tasks to cells. */
     else if (t_type == task_type_self) {
@@ -1509,11 +1494,6 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
       scheduler_addunlock(sched, ci->hydro.super->hydro.drift, t);
     }
 
-    /* Sort tasks depend on the drift of the cell (stars version). */
-    else if (t_type == task_type_stars_sort && ci->nodeID == nodeID) {
-      scheduler_addunlock(sched, ci->hydro.super->stars.drift, t);
-    }
-
     /* Self-interaction? */
     else if (t_type == task_type_self && t_subtype == task_subtype_density) {
 
@@ -1699,8 +1679,6 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
 
           scheduler_addunlock(sched, ci->hydro.super->stars.drift,
                               t_star_density);
-          scheduler_addunlock(sched, ci->hydro.super->stars.sorts,
-                              t_star_density);
           scheduler_addunlock(sched, ci->hydro.super->hydro.drift,
                               t_star_density);
           scheduler_addunlock(sched, ci->hydro.super->stars.stars_in,
@@ -1718,12 +1696,7 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
           scheduler_addunlock(sched, t_limiter, ci->super->timestep);
           scheduler_addunlock(sched, t_limiter, ci->super->timestep_limiter);
         }
-      } else /*(ci->nodeID != nodeID) */ {
-        if (with_feedback) {
-          scheduler_addunlock(sched, ci->hydro.super->stars.sorts,
-                              t_star_feedback);
-        }
-      }
+      } /*(ci->nodeID != nodeID) */
 
       if (cj->nodeID == nodeID) {
 
@@ -1733,8 +1706,6 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
 
           if (with_feedback) {
 
-            scheduler_addunlock(sched, cj->hydro.super->stars.sorts,
-                                t_star_density);
             scheduler_addunlock(sched, cj->hydro.super->stars.drift,
                                 t_star_density);
             scheduler_addunlock(sched, cj->hydro.super->hydro.drift,
@@ -1755,12 +1726,7 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
             scheduler_addunlock(sched, t_limiter, cj->super->timestep_limiter);
           }
         }
-      } else /*(cj->nodeID != nodeID) */ {
-        if (with_feedback) {
-          scheduler_addunlock(sched, cj->hydro.super->stars.sorts,
-                              t_star_feedback);
-        }
-      }
+      } /*(cj->nodeID != nodeID) */
     }
 
     /* Otherwise, sub-self interaction? */
@@ -1829,8 +1795,6 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
       if (with_feedback) {
 
         scheduler_addunlock(sched, ci->hydro.super->stars.drift,
-                            t_star_density);
-        scheduler_addunlock(sched, ci->hydro.super->stars.sorts,
                             t_star_density);
         scheduler_addunlock(sched, ci->hydro.super->hydro.drift,
                             t_star_density);
@@ -1955,8 +1919,6 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
 
         if (with_feedback) {
 
-          scheduler_addunlock(sched, ci->hydro.super->stars.sorts,
-                              t_star_density);
           scheduler_addunlock(sched, ci->hydro.super->stars.drift,
                               t_star_density);
           scheduler_addunlock(sched, ci->hydro.super->hydro.drift,
@@ -1976,14 +1938,7 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
           scheduler_addunlock(sched, t_limiter, ci->super->timestep);
           scheduler_addunlock(sched, t_limiter, ci->super->timestep_limiter);
         }
-      } else /* ci->nodeID != nodeID */ {
-
-        if (with_feedback) {
-          /* message("%p/%p",ci->hydro.super->stars.sorts, t_star_feedback); */
-          scheduler_addunlock(sched, ci->hydro.super->stars.sorts,
-                              t_star_feedback);
-        }
-      }
+      } /* ci->nodeID != nodeID */
 
       if (cj->nodeID == nodeID) {
 
@@ -1993,8 +1948,6 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
 
           if (with_feedback) {
 
-            scheduler_addunlock(sched, cj->hydro.super->stars.sorts,
-                                t_star_density);
             scheduler_addunlock(sched, cj->hydro.super->stars.drift,
                                 t_star_density);
             scheduler_addunlock(sched, cj->hydro.super->hydro.drift,
@@ -2015,12 +1968,7 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
             scheduler_addunlock(sched, t_limiter, cj->super->timestep_limiter);
           }
         }
-      } else /* cj->nodeID != nodeID */ {
-        if (with_feedback) {
-          scheduler_addunlock(sched, cj->hydro.super->stars.sorts,
-                              t_star_feedback);
-        }
-      }
+      } /* cj->nodeID != nodeID */
     }
   }
 }

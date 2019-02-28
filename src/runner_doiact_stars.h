@@ -629,7 +629,7 @@ void DOPAIR1_SUBSET_STARS(struct runner *r, struct cell *restrict ci,
 
 #ifdef SWIFT_DEBUG_CHECKS
         /* Check that particles have been drifted to the current time */
-        if (pi->ti_drift != e->ti_current)
+        if (spi->ti_drift != e->ti_current)
           error("Particle pi not drifted to current time");
         if (pj->ti_drift != e->ti_current)
           error("Particle pj not drifted to current time");
@@ -1529,11 +1529,6 @@ void DOPAIR1_BRANCH_STARS(struct runner *r, struct cell *ci, struct cell *cj) {
       (!cell_are_spart_drifted(ci, e) || !cell_are_part_drifted(cj, e)))
     error("Interacting undrifted cells.");
 
-  /* Have the cells been sorted? */
-  if (do_ci && (!(ci->stars.sorted & (1 << sid)) ||
-                ci->stars.dx_max_sort_old > space_maxreldx * ci->dmin))
-    error("Interacting unsorted cells.");
-
   if (do_ci && (!(cj->hydro.sorted & (1 << sid)) ||
                 cj->hydro.dx_max_sort_old > space_maxreldx * cj->dmin))
     error("Interacting unsorted cells.");
@@ -1547,19 +1542,13 @@ void DOPAIR1_BRANCH_STARS(struct runner *r, struct cell *ci, struct cell *cj) {
                 ci->hydro.dx_max_sort_old > space_maxreldx * ci->dmin))
     error("Interacting unsorted cells.");
 
-  if (do_cj && (!(cj->stars.sorted & (1 << sid)) ||
-                cj->stars.dx_max_sort_old > space_maxreldx * cj->dmin))
-    error("Interacting unsorted cells.");
-
 #ifdef SWIFT_DEBUG_CHECKS
   if (do_ci) {
     RUNNER_CHECK_SORT(hydro, part, cj, ci, sid);
-    RUNNER_CHECK_SORT(stars, spart, ci, cj, sid);
   }
 
   if (do_cj) {
     RUNNER_CHECK_SORT(hydro, part, ci, cj, sid);
-    RUNNER_CHECK_SORT(stars, spart, cj, ci, sid);
   }
 #endif /* SWIFT_DEBUG_CHECKS */
 
@@ -1826,12 +1815,6 @@ void DOSUB_PAIR1_STARS(struct runner *r, struct cell *ci, struct cell *cj,
       if (!cell_are_part_drifted(cj, e))
         error("Interacting undrifted cells (parts).");
 
-      /* Do any of the cells need to be sorted first? */
-      if (!(ci->stars.sorted & (1 << sid)) ||
-          ci->stars.dx_max_sort_old > ci->dmin * space_maxreldx) {
-        error("Interacting unsorted cell (sparts).");
-      }
-
       if (!(cj->hydro.sorted & (1 << sid)) ||
           cj->hydro.dx_max_sort_old > cj->dmin * space_maxreldx)
         error("Interacting unsorted cell (parts).");
@@ -1852,10 +1835,6 @@ void DOSUB_PAIR1_STARS(struct runner *r, struct cell *ci, struct cell *cj,
         error("Interacting unsorted cell (parts).");
       }
 
-      if (!(cj->stars.sorted & (1 << sid)) ||
-          cj->stars.dx_max_sort_old > cj->dmin * space_maxreldx) {
-        error("Interacting unsorted cell (sparts).");
-      }
     }
 
     if (do_ci || do_cj) DOPAIR1_BRANCH_STARS(r, ci, cj);

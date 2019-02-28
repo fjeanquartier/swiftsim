@@ -551,7 +551,6 @@ int cell_unpack(struct pcell *restrict pc, struct cell *restrict c,
       temp->hydro.dx_max_part = 0.f;
       temp->hydro.dx_max_sort = 0.f;
       temp->stars.dx_max_part = 0.f;
-      temp->stars.dx_max_sort = 0.f;
       temp->nodeID = c->nodeID;
       temp->parent = c;
       c->progeny[k] = temp;
@@ -1819,13 +1818,6 @@ void cell_clean(struct cell *c) {
       c->hydro.sort[i] = NULL;
     }
 
-  /* Stars */
-  for (int i = 0; i < 13; i++)
-    if (c->stars.sort[i] != NULL) {
-      free(c->stars.sort[i]);
-      c->stars.sort[i] = NULL;
-    }
-
   /* Recurse */
   for (int k = 0; k < 8; k++)
     if (c->progeny[k]) cell_clean(c->progeny[k]);
@@ -2068,65 +2060,6 @@ void cell_activate_hydro_sorts(struct cell *c, int sid, struct scheduler *s) {
   }
 }
 
-/**
- * @brief Activate the sorts up a cell hierarchy.
- */
-void cell_activate_stars_sorts_up(struct cell *c, struct scheduler *s) {
-
-  if (c == c->hydro.super) {
-#ifdef SWIFT_DEBUG_CHECKS
-    if (c->stars.sorts == NULL)
-      error("Trying to activate un-existing c->stars.sorts");
-#endif
-    scheduler_activate(s, c->stars.sorts);
-    if (c->nodeID == engine_rank) {
-      // MATTHIEU: to do: do we actually need both drifts here?
-      cell_activate_drift_spart(c, s);
-    }
-  } else {
-
-    for (struct cell *parent = c->parent;
-         parent != NULL && !parent->stars.do_sub_sort;
-         parent = parent->parent) {
-      parent->stars.do_sub_sort = 1;
-      if (parent == c->hydro.super) {
-#ifdef SWIFT_DEBUG_CHECKS
-        if (parent->stars.sorts == NULL)
-          error("Trying to activate un-existing parents->stars.sorts");
-#endif
-        scheduler_activate(s, parent->stars.sorts);
-        if (parent->nodeID == engine_rank) cell_activate_drift_spart(parent, s);
-        break;
-      }
-    }
-  }
-}
-
-/**
- * @brief Activate the sorts on a given cell, if needed.
- */
-void cell_activate_stars_sorts(struct cell *c, int sid, struct scheduler *s) {
-
-  /* Do we need to re-sort? */
-  if (c->stars.dx_max_sort > space_maxreldx * c->dmin) {
-
-    /* Climb up the tree to active the sorts in that direction */
-    for (struct cell *finger = c; finger != NULL; finger = finger->parent) {
-      if (finger->stars.requires_sorts) {
-        atomic_or(&finger->stars.do_sort, finger->stars.requires_sorts);
-        cell_activate_stars_sorts_up(finger, s);
-      }
-      finger->stars.sorted = 0;
-    }
-  }
-
-  /* Has this cell been sorted at all for the given sid? */
-  if (!(c->stars.sorted & (1 << sid)) || c->nodeID != engine_rank) {
-
-    atomic_or(&c->stars.do_sort, (1 << sid));
-    cell_activate_stars_sorts_up(c, s);
-  }
-}
 
 /**
  * @brief Traverse a sub-cell task and activate the hydro drift tasks that are
@@ -2840,10 +2773,8 @@ void cell_activate_subcell_stars_tasks(struct cell *ci, struct cell *cj,
       if (cell_is_active_stars(ci, e)) {
         /* We are going to interact this pair, so store some values. */
         atomic_or(&cj->hydro.requires_sorts, 1 << sid);
-        atomic_or(&ci->stars.requires_sorts, 1 << sid);
 
         cj->hydro.dx_max_sort_old = cj->hydro.dx_max_sort;
-        ci->stars.dx_max_sort_old = ci->stars.dx_max_sort;
 
         /* Activate the drifts if the cells are local. */
         if (ci->nodeID == engine_rank) cell_activate_drift_spart(ci, s);
@@ -2851,16 +2782,13 @@ void cell_activate_subcell_stars_tasks(struct cell *ci, struct cell *cj,
 
         /* Do we need to sort the cells? */
         cell_activate_hydro_sorts(cj, sid, s);
-        cell_activate_stars_sorts(ci, sid, s);
       }
 
       if (cell_is_active_stars(cj, e)) {
         /* We are going to interact this pair, so store some values. */
-        atomic_or(&cj->stars.requires_sorts, 1 << sid);
         atomic_or(&ci->hydro.requires_sorts, 1 << sid);
 
         ci->hydro.dx_max_sort_old = ci->hydro.dx_max_sort;
-        cj->stars.dx_max_sort_old = cj->stars.dx_max_sort;
 
         /* Activate the drifts if the cells are local. */
         if (ci->nodeID == engine_rank) cell_activate_drift_part(ci, s);
@@ -2868,7 +2796,6 @@ void cell_activate_subcell_stars_tasks(struct cell *ci, struct cell *cj,
 
         /* Do we need to sort the cells? */
         cell_activate_hydro_sorts(ci, sid, s);
-        cell_activate_stars_sorts(cj, sid, s);
       }
     }
   } /* Otherwise, pair interation */
@@ -3441,10 +3368,6 @@ int cell_unskip_stars_tasks(struct cell *c, struct scheduler *s) {
 
         /* Do ci */
         if (ci_active) {
-          /* stars for ci */
-          atomic_or(&ci->stars.requires_sorts, 1 << t->flags);
-          ci->stars.dx_max_sort_old = ci->stars.dx_max_sort;
-
           /* hydro for cj */
           atomic_or(&cj->hydro.requires_sorts, 1 << t->flags);
           cj->hydro.dx_max_sort_old = cj->hydro.dx_max_sort;
@@ -3454,7 +3377,6 @@ int cell_unskip_stars_tasks(struct cell *c, struct scheduler *s) {
           if (cj_nodeID == nodeID) cell_activate_drift_part(cj, s);
 
           /* Check the sorts and activate them if needed. */
-          cell_activate_stars_sorts(ci, t->flags, s);
           cell_activate_hydro_sorts(cj, t->flags, s);
         }
 
@@ -3464,17 +3386,12 @@ int cell_unskip_stars_tasks(struct cell *c, struct scheduler *s) {
           atomic_or(&ci->hydro.requires_sorts, 1 << t->flags);
           ci->hydro.dx_max_sort_old = ci->hydro.dx_max_sort;
 
-          /* stars for cj */
-          atomic_or(&cj->stars.requires_sorts, 1 << t->flags);
-          cj->stars.dx_max_sort_old = cj->stars.dx_max_sort;
-
           /* Activate the drift tasks. */
           if (cj_nodeID == nodeID) cell_activate_drift_spart(cj, s);
           if (ci_nodeID == nodeID) cell_activate_drift_part(ci, s);
 
           /* Check the sorts and activate them if needed. */
           cell_activate_hydro_sorts(ci, t->flags, s);
-          cell_activate_stars_sorts(cj, t->flags, s);
         }
       }
 
@@ -4046,7 +3963,6 @@ void cell_drift_spart(struct cell *c, const struct engine *e, int force) {
   struct spart *const sparts = c->stars.parts;
 
   float dx_max = 0.f, dx2_max = 0.f;
-  float dx_max_sort = 0.0f, dx2_max_sort = 0.f;
   float cell_h_max = 0.f;
 
   /* Drift irrespective of cell flags? */
@@ -4088,7 +4004,6 @@ void cell_drift_spart(struct cell *c, const struct engine *e, int force) {
 
         /* Update */
         dx_max = max(dx_max, cp->stars.dx_max_part);
-        dx_max_sort = max(dx_max_sort, cp->stars.dx_max_sort);
         cell_h_max = max(cell_h_max, cp->stars.h_max);
       }
     }
@@ -4096,7 +4011,6 @@ void cell_drift_spart(struct cell *c, const struct engine *e, int force) {
     /* Store the values */
     c->stars.h_max = cell_h_max;
     c->stars.dx_max_part = dx_max;
-    c->stars.dx_max_sort = dx_max_sort;
 
     /* Update the time of the last drift */
     c->stars.ti_old_part = ti_current;
@@ -4163,12 +4077,6 @@ void cell_drift_spart(struct cell *c, const struct engine *e, int force) {
                         sp->x_diff[2] * sp->x_diff[2];
       dx2_max = max(dx2_max, dx2);
 
-      const float dx2_sort = sp->x_diff_sort[0] * sp->x_diff_sort[0] +
-                             sp->x_diff_sort[1] * sp->x_diff_sort[1] +
-                             sp->x_diff_sort[2] * sp->x_diff_sort[2];
-
-      dx2_max_sort = max(dx2_max_sort, dx2_sort);
-
       /* Maximal smoothing length */
       cell_h_max = max(cell_h_max, sp->h);
 
@@ -4180,12 +4088,10 @@ void cell_drift_spart(struct cell *c, const struct engine *e, int force) {
 
     /* Now, get the maximal particle motion from its square */
     dx_max = sqrtf(dx2_max);
-    dx_max_sort = sqrtf(dx2_max_sort);
 
     /* Store the values */
     c->stars.h_max = cell_h_max;
     c->stars.dx_max_part = dx_max;
-    c->stars.dx_max_sort = dx_max_sort;
 
     /* Update the time of the last drift */
     c->stars.ti_old_part = ti_current;
@@ -4266,42 +4172,6 @@ void cell_drift_multipole(struct cell *c, const struct engine *e) {
 
   /* Update the time of the last drift */
   c->grav.ti_old_multipole = ti_current;
-}
-
-/**
- * @brief Resets all the sorting properties for the stars in a given cell
- * hierarchy.
- *
- * @param c The #cell to clean.
- * @param is_super Is this a super-cell?
- */
-void cell_clear_stars_sort_flags(struct cell *c, const int is_super) {
-
-  /* Recurse if possible */
-  if (c->split) {
-    for (int k = 0; k < 8; k++)
-      if (c->progeny[k] != NULL)
-        cell_clear_stars_sort_flags(c->progeny[k], /*is_super=*/0);
-  }
-
-  /* Free the sorted array at the level where it was allocated */
-  if (is_super) {
-
-#ifdef SWIFT_DEBUG_CHECKS
-    if (c != c->hydro.super) error("Cell is not a super-cell!!!");
-#endif
-
-    for (int i = 0; i < 13; i++) {
-      free(c->stars.sort[i]);
-    }
-  }
-
-  /* Indicate that the cell is not sorted and cancel the pointer sorting arrays.
-   */
-  c->stars.sorted = 0;
-  for (int i = 0; i < 13; i++) {
-    c->stars.sort[i] = NULL;
-  }
 }
 
 /**
